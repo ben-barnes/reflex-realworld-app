@@ -6,7 +6,7 @@ module RealWorld.Routing (
 , isRegister
 ) where
 
-import RealWorld.Data (ArticleSlug, Username)
+import RealWorld.Common.Data (ArticleSlug, Username)
 
 data Route
   = Home
@@ -17,7 +17,7 @@ data Route
   | Article ArticleSlug
   | Profile Username
   | Favorites Username
-    deriving (Eq, Ord)
+    deriving (Eq)
 
 isHome :: Route -> Bool
 isHome Home = True

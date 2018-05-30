@@ -4,19 +4,23 @@
 
 -- TODO:
 -- [ ] Non-breaking space in New Post link
--- [ ] Dynamic active link in nav
+-- [x] Dynamic active link in nav
+-- [ ] Format date in article preview
 
 module Main (
   main
 ) where
 
+import Data.Foldable (traverse_)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Language.Javascript.JSaddle.Warp (run)
+import RealWorld.Common.Data
 import RealWorld.Routing (Route)
 import Reflex.Dom hiding (mainWidgetWithHead, run)
 import Reflex.Dom.Core (mainWidgetWithHead)
 
+import qualified Data.Aeson as JSON
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified RealWorld.Routing as Route
@@ -41,12 +45,57 @@ conduitHead = do
 
 conduitBody :: (MonadWidget t m) => Dynamic t Route -> m ()
 conduitBody route =
-  let getPosts = xhrRequest "GET" "https://conduit.productionready.io/api/articles" def
+  let articlesUrl = "https://conduit.productionready.io/api/articles"
   in  do
-    response <- performRequestAsync $ fmap (const getPosts) (updated route)
-    responsePrintable <- holdDyn "No response received." (fmap (fromMaybe "Something went wrong." . _xhrResponse_responseText) response)
-    dynText responsePrintable
+    response <- getAndDecode $ fmap (const articlesUrl) (updated route)
+    let success = fmapMaybe id response
+    widgetHold (text "No response received.") (fmap conduitHomePage success)
     return ()
+
+conduitHomePage :: (MonadWidget t m) => Articles -> m ()
+conduitHomePage as =
+  divClass "home-page" $ do
+    divClass "banner" $
+      divClass "container" $ do
+        elClass "h1" "logo-font" $ text "conduit"
+        el "p" $ text "A place to share your knowledge."
+    divClass "container page" $
+      divClass "row" $ do
+        divClass "col-md-9" $ do
+          divClass "feed-toggle" $
+            elClass "ul" "nav nav-pills outline-active" $ do
+              elClass "li" "nav-item" $ anchorClass "" "nav-link disabled" $ text "Your Feed"
+              elClass "li" "nav-item" $ anchorClass "" "nav-link active" $ text "Global Feed"
+          traverse_ articlePreview (articlesArticles as)
+        divClass "col-md-3" $
+          divClass "sidebar" $ do
+            el "p" $ text "Popular Tags"
+            divClass "tag-list" $ do
+              anchorClass "" "tag-pill tag-default" $ text "programming"
+              anchorClass "" "tag-pill tag-default" $ text "javascript"
+              anchorClass "" "tag-pill tag-default" $ text "emberjs"
+              anchorClass "" "tag-pill tag-default" $ text "angularjs"
+              anchorClass "" "tag-pill tag-default" $ text "react"
+              anchorClass "" "tag-pill tag-default" $ text "mean"
+              anchorClass "" "tag-pill tag-default" $ text "node"
+              anchorClass "" "tag-pill tag-default" $ text "rails"
+
+articlePreview:: (MonadWidget t m) => Article -> m ()
+articlePreview a =
+  divClass "article-preview" $ do
+    divClass "article-meta" $ do
+      anchor "/profile" $ elAttr "img" (Map.singleton "src" (getArticleAuthorImage . articleAuthorImage . articleAuthor $ a)) blank
+      divClass "info" $ do
+        anchorClass "" "author" $ text . getUsername . articleAuthorUsername . articleAuthor $ a
+        elClass "span" "date" $ text . T.pack . show . getArticleCreatedAt . articleCreatedAt $ a
+      buttonClass "btn btn-outline-primary btn-sm pull-xs-right" $ do
+        elClass "i" "ion-heart" blank
+        text . T.pack . show . getArticleFavoritesCount . articleFavoritesCount $ a
+      return ()
+    anchorClass "" "preview-link" $ do
+      el "h1" $ text . getArticleTitle . articleTitle $ a
+      el "p" $ text . getArticleDescription . articleDescription $ a
+      el "span" $ text "Read more..."
 
 conduitNav :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
 conduitNav route =
@@ -114,6 +163,11 @@ anchorDynClassClickable href cls inner =
   in  do
     (e, _) <- elDynAttr' "span" attrs inner
     return $ domEvent Click e
+
+buttonClass :: (MonadWidget t m) => Text -> m () -> m (Event t ())
+buttonClass cls inner = do
+  (e, _) <- elClass' "button" cls inner
+  return $ domEvent Click e
 
 meta :: (MonadWidget t m) => [(Text, Text)] -> m ()
 meta =
