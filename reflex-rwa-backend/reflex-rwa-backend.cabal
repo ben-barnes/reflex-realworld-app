@@ -1,0 +1,16 @@
+name:                reflex-rwa-backend
+version:             0.1.0.0
+license:             BSD3
+license-file:        LICENSE
+author:              Ben Barnes
+maintainer:          ben.barnes@data61.csiro.au
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable reflex-rwa-backend
+  main-is:             Main.hs
+  build-depends:       base
+                     , reflex-rwa-common
+                     , reflex-dom
+  hs-source-dirs:      src
+  default-language:    Haskell2010
