@@ -1,80 +1,128 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
+
+-- TODO:
+-- [ ] Non-breaking space in New Post link
+-- [ ] Dynamic active link in nav
 
 module Main (
   main
 ) where
 
-import Control.Applicative ((<*>))
-import Data.Map (Map)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import Reflex.Dom
-import Text.Read (readMaybe)
+import Language.Javascript.JSaddle.Warp (run)
+import RealWorld.Routing (Route)
+import Reflex.Dom hiding (mainWidgetWithHead, run)
+import Reflex.Dom.Core (mainWidgetWithHead)
 
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified RealWorld.Routing as Route
 
 main :: IO ()
-main = mainWidget calculator
+main = run 3911 $ mainWidgetWithHead conduitHead $ do
+  onLoad <- getPostBuild
+  let initRouteChange = fmap (const Route.Home) onLoad
+  rec navRouteChange <- conduitNav currentRoute
+      let routeChange = leftmost [initRouteChange, navRouteChange]
+      currentRoute <- holdDyn Route.Home routeChange
+  conduitBody currentRoute
+  conduitFooter
 
-app1 :: (MonadWidget t m) => m ()
-app1 = el "div" $ text "Welcome to Reflex"
+conduitHead :: (MonadWidget t m) => m ()
+conduitHead = do
+  meta [("charset", "utf-8")]
+  stylesheet "//code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css"
+  stylesheet "//fonts.googleapis.com/css?family=Titillium+Web:700|Source+Serif+Pro:400,700|Merriweather+Sans:400,700|Source+Sans+Pro:400,300,600,700,300italic,400italic,600italic,700italic"
+  stylesheet "//demo.productionready.io/main.css"
+  el "title" $ text "Conduit"
 
-app2 :: (MonadWidget t m) => m ()
-app2 =
-  el "div" $ do
-    el "p" $ text "Reflex is:"
-    el "ul" $ do
-      el "li" $ text "Efficient"
-      el "li" $ text "Higher-order"
-      el "li" $ text "Glitch-free"
+conduitBody :: (MonadWidget t m) => Dynamic t Route -> m ()
+conduitBody route =
+  let getPosts = xhrRequest "GET" "https://conduit.productionready.io/api/articles" def
+  in  do
+    response <- performRequestAsync $ fmap (const getPosts) (updated route)
+    responsePrintable <- holdDyn "No response received." (fmap (fromMaybe "Something went wrong." . _xhrResponse_responseText) response)
+    dynText responsePrintable
+    return ()
 
-app3 :: (MonadWidget t m) => m ()
-app3 = el "div" $ do
-  t <- textInput def
-  dynText $ _textInput_value t
+conduitNav :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
+conduitNav route =
+  let routeClass p =
+        fmap (\currentRoute -> if p currentRoute then active else inactive) route
+      active = "nav-link active"
+      inactive = "nav-link"
+  in  elClass "nav" "navbar navbar-light" $
+        divClass "container" $ do
+          anchorClass "/" "navbar-brand" $ text "conduit"
+          elClass "ul" "nav navbar-nav pull-xs-right" $ do
+            homeClicks <- elClass "li" "nav-item" $
+              anchorDynClassClickable "/" (routeClass Route.isHome) $
+                text "Home"
+            editorClicks <- elClass "li" "nav-item" $
+              anchorDynClassClickable "/" (routeClass Route.isEditor) $ do
+                elClass "i" "ion-compose" blank
+                text " New Post"
+            settingsClicks <- elClass "li" "nav-item" $
+              anchorDynClassClickable "/" (routeClass Route.isSettings) $ do
+                elClass "i" "ion-gear-a" blank
+                text " Settings"
+            registerClicks <- elClass "li" "nav-item" $
+              anchorDynClassClickable "/" (routeClass Route.isRegister) $
+                text "Sign up"
+            return $
+              leftmost [
+                  fmap (const Route.Home) homeClicks
+                , fmap (const $ Route.Editor Nothing) editorClicks
+                , fmap (const Route.Settings) settingsClicks
+                , fmap (const Route.Register) registerClicks
+                ]
 
-app4 :: (MonadWidget t m) => m ()
-app4 = el "div" $ do
-  t <- textInput def
-  text "Last key pressed: "
-  let keypressEvent = fmap (T.pack . show) $ _textInput_keypress t
-  keypressDyn <- holdDyn "None" keypressEvent
-  dynText keypressDyn
+conduitFooter :: (MonadWidget t m) => m ()
+conduitFooter =
+  el "footer" $
+    divClass "container" $ do
+      anchorClass "/" "logo-font" $ text "conduit"
+      elClass "span" "attribution" $ do
+        text "An interactive learning project from "
+        anchor "https://thinkster.io" $ text "Thinkster"
+        text ". Code & design licensed under MIT."
 
-numberInput :: (MonadWidget t m) => m (Dynamic t (Maybe Double))
-numberInput = do
-  let errorState = "style" =: "border-color: red"
-      validState = "style" =: "border-color: green"
-  rec n <- textInput $ def & textInputConfig_inputType .~ "number"
-                       & textInputConfig_initialValue .~ "0"
-                       & textInputConfig_attributes .~ attrs
-      let result = fmap (readMaybe . T.unpack) $ _textInput_value n
-          attrs = fmap (maybe errorState (const validState)) result
-  return result
+anchor :: (MonadWidget t m) => Text -> m a -> m a
+anchor href =
+  elAttr "a" (Map.fromList [("href", href)])
 
-calculator :: (MonadWidget t m) => m ()
-calculator = el "div" $ do
-  nx <- numberInput
-  d <- dropdown Times (constDyn ops) def
-  ny <- numberInput
-  text " = "
-  let values = zipDynWith (,) nx ny
-      result = zipDynWith (\o (x, y) -> runOp o <$> x <*> y) (_dropdown_value d) values
-  dynText . fmap (T.pack . show) $ result
+anchorClass :: (MonadWidget t m) => Text -> Text -> m a -> m a
+anchorClass href cls =
+  elAttr "a" (Map.fromList [("class", cls), ("href", href)])
 
-data Op
-  = Plus
-  | Minus
-  | Times
-  | Divide
-    deriving (Eq, Ord)
+anchorDynClass :: (MonadWidget t m) => Text -> Dynamic t Text -> m a -> m a
+anchorDynClass href cls =
+  let attrs = fmap (\cls' -> Map.fromList [("class", cls'), ("href", href)]) cls
+  in  elDynAttr "a" attrs
 
-ops :: Map Op Text
-ops = Map.fromList [(Plus, "+"), (Minus, "-"), (Times, "*"), (Divide, "/")]
+anchorDynClassClickable
+  :: (MonadWidget t m)
+  => Text
+  -> Dynamic t Text
+  -> m a
+  -> m (Event t ())
+anchorDynClassClickable href cls inner =
+  let attrs = fmap (\cls' -> Map.fromList [("class", cls'), ("href", href)]) cls
+  in  do
+    (e, _) <- elDynAttr' "span" attrs inner
+    return $ domEvent Click e
 
-runOp :: (Fractional a) => Op -> a -> a -> a
-runOp Plus = (+)
-runOp Minus = (-)
-runOp Times = (*)
-runOp Divide = (/)
+meta :: (MonadWidget t m) => [(Text, Text)] -> m ()
+meta =
+  singleTag "meta"
+
+stylesheet :: (MonadWidget t m) => Text -> m ()
+stylesheet url =
+  singleTag "link" [("href", url), ("rel", "stylesheet"), ("type", "text/css")]
+
+singleTag :: (MonadWidget t m) => Text -> [(Text, Text)] -> m ()
+singleTag name contents =
+  elAttr name (Map.fromList contents) blank
