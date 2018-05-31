@@ -23,6 +23,10 @@ import Reflex.Dom.Core (mainWidgetWithHead)
 import qualified Data.Aeson as JSON
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import qualified GHCJS.DOM.Element as DOM
+import qualified GHCJS.DOM.EventM as DOM
+import qualified GHCJS.DOM.GlobalEventHandlers as DOM
+import qualified GHCJS.DOM.MouseEvent as DOM
 import qualified RealWorld.Routing as Route
 
 main :: IO ()
@@ -153,7 +157,7 @@ anchorDynClass href cls =
   in  elDynAttr "a" attrs
 
 anchorDynClassClickable
-  :: (MonadWidget t m)
+  :: (DOM.IsGlobalEventHandlers (m a), MonadWidget t m)
   => Text
   -> Dynamic t Text
   -> m a
@@ -161,8 +165,8 @@ anchorDynClassClickable
 anchorDynClassClickable href cls inner =
   let attrs = fmap (\cls' -> Map.fromList [("class", cls'), ("href", href)]) cls
   in  do
-    (e, _) <- elDynAttr' "span" attrs inner
-    return $ domEvent Click e
+    (e, _) <- elDynAttr' "a" attrs inner
+    wrapDomEvent (_element_raw e) (`DOM.on` DOM.click) DOM.preventDefault
 
 buttonClass :: (MonadWidget t m) => Text -> m () -> m (Event t ())
 buttonClass cls inner = do

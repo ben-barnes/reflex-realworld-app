@@ -12,6 +12,7 @@ executable reflex-rwa-frontend
   build-depends:       aeson
                      , base
                      , containers
+                     , ghcjs-dom
                      , jsaddle-warp
                      , reflex-rwa-common
                      , reflex-dom
