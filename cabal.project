@@ -1,4 +1,4 @@
 packages:
-  reflex-rwa-common/
-  reflex-rwa-backend/
-  reflex-rwa-frontend/
+  conduit-common/
+  conduit-backend/
+  conduit-frontend/

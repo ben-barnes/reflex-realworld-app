@@ -1,4 +1,4 @@
 compiler: ghcjs
 packages:
-  reflex-rwa-common/
-  reflex-rwa-frontend/
+  conduit-common/
+  conduit-frontend/

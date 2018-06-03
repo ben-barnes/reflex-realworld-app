@@ -1,12 +1,12 @@
 (import ./reflex-platform {}).project ({ pkgs, ... }: {
   packages = {
-    reflex-rwa-common = ./reflex-rwa-common;
-    reflex-rwa-backend = ./reflex-rwa-backend;
-    reflex-rwa-frontend = ./reflex-rwa-frontend;
+    conduit-common = ./conduit-common;
+    conduit-backend = ./conduit-backend;
+    conduit-frontend = ./conduit-frontend;
   };
 
   shells = {
-    ghc = ["reflex-rwa-common" "reflex-rwa-backend" "reflex-rwa-frontend"];
-    ghcjs = ["reflex-rwa-common" "reflex-rwa-frontend"];
+    ghc = ["conduit-common" "conduit-backend" "conduit-frontend"];
+    ghcjs = ["conduit-common" "conduit-frontend"];
   };
 })

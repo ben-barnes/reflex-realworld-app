@@ -1,25 +1,29 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module RealWorld.Common.Data (
+module Conduit.Common.Data (
   Article(..)
-, ArticleAuthor(..)
-, ArticleAuthorBio(..)
-, ArticleAuthorImage(..)
-, ArticleAuthorFollowing(..)
 , ArticleBody(..)
 , ArticleCreatedAt(..)
 , ArticleDescription(..)
 , ArticleFavorited(..)
 , ArticleFavoritesCount(..)
 , ArticleSlug(..)
-, ArticleTag(..)
 , ArticleTitle(..)
 , ArticleUpdatedAt(..)
 , Articles(..)
+, Bio(..)
+, Email(Email)
+, Image(..)
+, Password(Password)
+, Profile(..)
+, ProfileFollowing(..)
+, Tag(..)
+, Tags(..)
+, Token(..)
 , Username(..)
 ) where
 
-import Data.Aeson ((.:), FromJSON, parseJSON, withObject)
+import Data.Aeson ((.:), FromJSON, ToJSON, parseJSON, toJSON, withObject)
 import Data.Text (Text)
 import Data.Time (UTCTime)
 
@@ -28,13 +32,13 @@ data Article = Article {
 , articleTitle :: ArticleTitle
 , articleDescription :: ArticleDescription
 , articleBody :: ArticleBody
-, articleTagList :: [ArticleTag]
+, articleTagList :: Tags
 , articleCreatedAt :: ArticleCreatedAt
 , articleUpdatedAt :: ArticleUpdatedAt
 , articleFavorited :: ArticleFavorited
 , articleFavoritesCount :: ArticleFavoritesCount
-, articleAuthor :: ArticleAuthor
-} deriving (Eq)
+, articleAuthor :: Profile
+} deriving (Eq, Ord)
 
 instance FromJSON Article where
   parseJSON = withObject "Article" $ \v -> Article
@@ -49,100 +53,58 @@ instance FromJSON Article where
     <*> v .: "favoritesCount"
     <*> v .: "author"
 
-data ArticleAuthor = ArticleAuthor {
-  articleAuthorUsername :: Username
-, articleAuthorBio :: Maybe ArticleAuthorBio
-, articleAuthorImage :: ArticleAuthorImage
-, articleAuthorFollowing :: ArticleAuthorFollowing
-} deriving (Eq)
-
-instance FromJSON ArticleAuthor where
-  parseJSON = withObject "ArticleAuthor" $ \v -> ArticleAuthor
-    <$> v .: "username"
-    <*> v .: "bio"
-    <*> v .: "image"
-    <*> v .: "following"
-
-newtype ArticleAuthorBio = ArticleAuthorBio {
-  getArticleAuthorBio :: Text
-} deriving (Eq)
-
-instance FromJSON ArticleAuthorBio where
-  parseJSON = fmap ArticleAuthorBio . parseJSON
-
-newtype ArticleAuthorFollowing = ArticleAuthorFollowing {
-  getArticleAuthorFollowing :: Bool
-} deriving (Eq)
-
-instance FromJSON ArticleAuthorFollowing where
-  parseJSON = fmap ArticleAuthorFollowing . parseJSON
-
-newtype ArticleAuthorImage = ArticleAuthorImage {
-  getArticleAuthorImage :: Text
-} deriving (Eq)
-
-instance FromJSON ArticleAuthorImage where
-  parseJSON = fmap ArticleAuthorImage . parseJSON
-
 newtype ArticleBody = ArticleBody {
   getArticleBody :: Text
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleBody where
   parseJSON = fmap ArticleBody . parseJSON
 
 newtype ArticleCreatedAt = ArticleCreatedAt {
   getArticleCreatedAt :: UTCTime
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleCreatedAt where
   parseJSON = fmap ArticleCreatedAt . parseJSON
 
 newtype ArticleDescription = ArticleDescription {
   getArticleDescription :: Text
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleDescription where
   parseJSON = fmap ArticleDescription . parseJSON
 
 newtype ArticleFavorited = ArticleFavorited {
   getArticleFavorited :: Bool
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleFavorited where
   parseJSON = fmap ArticleFavorited . parseJSON
 
 newtype ArticleFavoritesCount = ArticleFavoritesCount {
   getArticleFavoritesCount :: Int
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleFavoritesCount where
   parseJSON = fmap ArticleFavoritesCount . parseJSON
 
 newtype ArticleSlug = ArticleSlug {
   getArticleSlug :: Text
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleSlug where
   parseJSON = fmap ArticleSlug . parseJSON
 
-newtype ArticleTag = ArticleTag {
-  getArticleTag :: Text
-} deriving (Eq)
-
-instance FromJSON ArticleTag where
-  parseJSON = fmap ArticleTag . parseJSON
-
 newtype ArticleTitle = ArticleTitle {
   getArticleTitle :: Text
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleTitle where
   parseJSON = fmap ArticleTitle . parseJSON
 
 newtype ArticleUpdatedAt = ArticleUpdatedAt {
   getArticleUpdatedAt :: UTCTime
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticleUpdatedAt where
   parseJSON = fmap ArticleUpdatedAt . parseJSON
@@ -150,7 +112,7 @@ instance FromJSON ArticleUpdatedAt where
 data Articles = Articles {
   articlesArticles :: [Article]
 , articlesArticlesCount :: ArticlesCount
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON Articles where
   parseJSON = withObject "Articles" $ \v -> Articles
@@ -159,14 +121,93 @@ instance FromJSON Articles where
 
 newtype ArticlesCount = ArticlesCount {
   getArticlesCount :: Int
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON ArticlesCount where
   parseJSON = fmap ArticlesCount . parseJSON
 
+newtype Email = Email {
+  getEmail :: Text
+} deriving (Eq, Ord)
+
+instance FromJSON Email where
+  parseJSON = fmap Email . parseJSON
+
+instance ToJSON Email where
+  toJSON = toJSON . getEmail
+
+newtype Password = Password {
+  getPassword :: Text
+} deriving (Eq, Ord)
+
+instance FromJSON Password where
+  parseJSON = fmap Password . parseJSON
+
+instance ToJSON Password where
+  toJSON = toJSON . getPassword
+
+data Profile = Profile {
+  profileUsername :: Username
+, profileBio :: Maybe Bio
+, profileImage :: Image
+, profileFollowing :: ProfileFollowing
+} deriving (Eq, Ord)
+
+instance FromJSON Profile where
+  parseJSON = withObject "Profile" $ \v -> Profile
+    <$> v .: "username"
+    <*> v .: "bio"
+    <*> v .: "image"
+    <*> v .: "following"
+
+newtype Bio = Bio {
+  getBio :: Text
+} deriving (Eq, Ord)
+
+instance FromJSON Bio where
+  parseJSON = fmap Bio . parseJSON
+
+newtype ProfileFollowing = ProfileFollowing {
+  getProfileFollowing :: Bool
+} deriving (Eq, Ord)
+
+instance FromJSON ProfileFollowing where
+  parseJSON = fmap ProfileFollowing . parseJSON
+
+newtype Image = Image {
+  getImage :: Text
+} deriving (Eq, Ord)
+
+instance FromJSON Image where
+  parseJSON = fmap Image . parseJSON
+
+newtype Tag = Tag {
+  getTag :: Text
+} deriving (Eq, Ord)
+
+instance FromJSON Tag where
+  parseJSON = fmap Tag . parseJSON
+
+newtype Tags = Tags {
+  getTags :: [Tag]
+} deriving (Eq, Ord)
+
+instance FromJSON Tags where
+  parseJSON = fmap Tags . parseJSON
+
+newtype Token = Token {
+  getToken :: Text
+} deriving (Eq, Ord)
+
+instance FromJSON Token where
+  parseJSON = fmap Token . parseJSON
+
 newtype Username = Username {
   getUsername :: Text
-} deriving (Eq)
+} deriving (Eq, Ord)
 
 instance FromJSON Username where
   parseJSON = fmap Username . parseJSON
+
+instance ToJSON Username where
+  toJSON = toJSON . getUsername
