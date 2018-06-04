@@ -2,6 +2,7 @@
 
 module Conduit.Frontend.Routing (
   Route(..)
+, UnknownRoute(..)
 , isArticle
 , isHome
 , isEditor
@@ -10,6 +11,7 @@ module Conduit.Frontend.Routing (
 , isProfile
 , isSettings
 , isRegister
+, parseRoute
 , renderRoute
 ) where
 
@@ -27,6 +29,10 @@ data Route
   | Profile Username
   | Favorites Username
     deriving (Eq, Ord)
+
+newtype UnknownRoute = UnknownRoute {
+  getUnknownRoute :: Text
+} deriving (Eq, Ord)
 
 isHome :: Route -> Bool
 isHome Home = True
@@ -59,6 +65,11 @@ isProfile _ = False
 isFavorites :: Route -> Bool
 isFavorites (Favorites _) = True
 isFavorites _ = False
+
+parseRoute :: Text -> Either UnknownRoute Route
+parseRoute "#/home"     = Right Home
+parseRoute "#/register" = Right Register
+parseRoute r            = Left (UnknownRoute r)
 
 renderRoute :: Route -> Text
 renderRoute r =

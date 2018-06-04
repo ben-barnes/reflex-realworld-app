@@ -12,13 +12,15 @@ module Main (
 ) where
 
 import Data.Functor (void)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Language.Javascript.JSaddle.Warp (run)
+import Conduit.Common.Data (Articles(Articles), ArticlesCount(ArticlesCount))
 import Conduit.Frontend.API (ArticlesRequest(ArticlesRequest), articles)
 import Conduit.Frontend.Components
 import Conduit.Frontend.Pages.Home (homePage)
 import Conduit.Frontend.Pages.Register (registerPage)
-import Conduit.Frontend.Routing (Route)
+import Conduit.Frontend.Routing (Route, parseRoute)
 import Reflex.Dom hiding (mainWidgetWithHead, run)
 import Reflex.Dom.Core (mainWidgetWithHead)
 
@@ -28,9 +30,17 @@ import qualified Conduit.Frontend.Routing as Route
 main :: IO ()
 main = run 3911 $ mainWidgetWithHead conduitHead $ do
   onLoad <- getPostBuild
-  let initRouteChange = fmap (const Route.Home) onLoad
-  rec navRouteChange <- conduitNav currentRoute
-      let routeChange = leftmost [initRouteChange, navRouteChange]
+  windowHash <- currentHash
+  windowHashChange <- hashChangeEvent
+  let redirect404 (Right r) = r
+      redirect404 (Left _) = Route.Home
+      parseRouteRedirect = redirect404 . parseRoute
+      windowRoute = parseRouteRedirect <$> windowHash
+      initialRoute = fromMaybe Route.Home windowRoute
+      initialRouteEvent = const initialRoute <$> onLoad
+      allWindowRouteEvents = leftmost [initialRouteEvent, parseRouteRedirect <$> windowHashChange]
+  rec navRouteEvent <- conduitNav currentRoute
+      let routeChange = leftmost [allWindowRouteEvents, navRouteEvent]
       currentRoute <- holdDyn Route.Home routeChange
   conduitBody currentRoute
   conduitFooter
@@ -45,14 +55,11 @@ conduitHead = do
 
 conduitBody :: (MonadWidget t m) => Dynamic t Route -> m ()
 conduitBody route =
-  let articlesReq = ArticlesRequest Nothing Nothing Nothing Nothing Nothing
-      xhrReq = articles articlesReq
-  in  do
-    -- response <- performRequestAsync $ fmap (const xhrReq) (updated route)
-    -- let success = fmapMaybe decodeXhrResponse response
-    -- void $ widgetHold (text "No response received.") (fmap homePage success)
-    void $ registerPage
+  void . dyn $ choosePage <$> route
 
+choosePage :: (MonadWidget t m) => Route -> m ()
+choosePage Route.Register = void $ registerPage
+choosePage _ = void $ homePage (Articles [] (ArticlesCount 0))
 
 conduitNav :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
 conduitNav route =

@@ -11,6 +11,7 @@ module Conduit.Common.Data (
 , ArticleTitle(..)
 , ArticleUpdatedAt(..)
 , Articles(..)
+, ArticlesCount(..)
 , Bio(..)
 , Email(Email)
 , Image(..)

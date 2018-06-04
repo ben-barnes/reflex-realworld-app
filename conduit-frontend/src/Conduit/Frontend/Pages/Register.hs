@@ -2,7 +2,7 @@
 {-# LANGUAGE RecursiveDo #-}
 
 -- TODO
--- [ ] Hook up register response, render errors and return authed profile
+-- [x] Hook up register response, render errors and return authed profile
 
 module Conduit.Frontend.Pages.Register (
   registerPage
@@ -31,7 +31,6 @@ import Conduit.Frontend.Components (aAttr)
 import Conduit.Frontend.Routing (Route(Login), renderRoute)
 import Control.Monad ((>=>))
 import Data.Foldable (traverse_)
-import Data.Functor (void)
 import Data.List (concat)
 import Data.Maybe (catMaybes)
 import Data.Semigroup ((<>))
@@ -58,6 +57,7 @@ import Reflex.Dom (
   , elClass'
   , fmapMaybe
   , holdDyn
+  , leftmost
   , performRequestAsync
   , tagPromptlyDyn
   , text
@@ -67,15 +67,19 @@ import Reflex.Dom (
 
 import qualified Data.Map as Map
 
-registerPage :: (MonadWidget t m) => m (Event t AuthProfile)
+data RegisterPageEvent
+  = RegisterPageEventAuth AuthProfile
+  | RegisterPageEventRoute Route
+
+registerPage :: (MonadWidget t m) => m (Event t RegisterPageEvent)
 registerPage =
   divClass "auth-page" $
     divClass "container page" $
       divClass "row" $
         divClass "col-md-6 offset-md-3 col-xs-12" $ do
           elClass "h1" "text-xs-center" $ text "Sign up"
-          elClass "p" "text-xs-center" $
-            void $ aAttr ("href" =: renderRoute Login) $ text "Have an account?"
+          loginClicked <- elClass "p" "text-xs-center" $
+            aAttr ("href" =: renderRoute Login) $ text "Have an account?"
           rec _ <- widgetHold blank (errorList <$> failure)
               (success, failure) <- el "form" $ do
                 nameValue <- formTextInput "text" "Your Name"
@@ -95,12 +99,16 @@ registerPage =
                     getFailure (RegisterResponseFailure f) = Just f
                     getFailure _ = Nothing
                     resSuccess = fmapMaybe (decodeXhrResponse >=> getSuccess) res
-                    resFailure = fmapMaybe (decodeXhrResponse >=> getFailure) res
+                    resFailure = (decodeXhrResponse >=> getFailure) <$> res
                 return (resSuccess, resFailure)
-          return success
+          return $ leftmost [
+              RegisterPageEventAuth <$> success
+            , const (RegisterPageEventRoute Login) <$> loginClicked
+            ]
 
-errorList :: (MonadWidget t m) => RegisterFailure -> m ()
-errorList f =
+errorList :: (MonadWidget t m) => Maybe RegisterFailure -> m ()
+errorList Nothing = blank
+errorList (Just f) =
   let errors = registerFailureErrors f
       allErrors = concat . catMaybes $ [
           prefixErrors "Email" <$> registerErrorsEmail errors
