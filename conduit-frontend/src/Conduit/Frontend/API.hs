@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Conduit.Frontend.API (
-  ArticlesRequest(..)
+  ArticlesLimit(..)
+, ArticlesRequest(..)
 , AuthProfile(..)
 , LoginRequest(..)
 , NewUser(..)

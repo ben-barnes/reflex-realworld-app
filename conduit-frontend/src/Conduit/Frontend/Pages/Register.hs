@@ -27,8 +27,8 @@ import Conduit.Frontend.API (
   , registerErrorsUsername
   , registerFailureErrors
   )
-import Conduit.Frontend.Components (aAttr)
-import Conduit.Frontend.Routing (Route(Login), renderRoute)
+import Conduit.Frontend.Routes (Route(Login), printRoute)
+import Conduit.Frontend.Widgets (aAttr)
 import Control.Monad ((>=>))
 import Data.Foldable (traverse_)
 import Data.List (concat)
@@ -79,7 +79,7 @@ registerPage =
         divClass "col-md-6 offset-md-3 col-xs-12" $ do
           elClass "h1" "text-xs-center" $ text "Sign up"
           loginClicked <- elClass "p" "text-xs-center" $
-            aAttr ("href" =: renderRoute Login) $ text "Have an account?"
+            aAttr ("href" =: printRoute Login) $ text "Have an account?"
           rec _ <- widgetHold blank (errorList <$> failure)
               (success, failure) <- el "form" $ do
                 nameValue <- formTextInput "text" "Your Name"

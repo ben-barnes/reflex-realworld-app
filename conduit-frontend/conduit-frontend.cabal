@@ -20,9 +20,12 @@ executable conduit-frontend
                      , text
   hs-source-dirs:      src
   default-language:    Haskell2010
-  other-modules:       Conduit.Frontend.Components
+  other-modules:       Conduit.Frontend.Components.Head
+                     , Conduit.Frontend.Components.Nav
                      , Conduit.Frontend.API
                      , Conduit.Frontend.Pages.Home
                      , Conduit.Frontend.Pages.Register
-                     , Conduit.Frontend.Routing
+                     , Conduit.Frontend.Routes
+                     , Conduit.Frontend.Router
+                     , Conduit.Frontend.Widgets
   ghc-options:         -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-import-lists

@@ -32,8 +32,13 @@ import Conduit.Common.Data (
   , getTags
   , getUsername
   )
-import Conduit.Frontend.Components (aAttr, aDynAttr)
-import Conduit.Frontend.Routing (Route(Article, Profile), renderRoute)
+import Conduit.Frontend.API (
+    ArticlesLimit(ArticlesLimit)
+  , ArticlesRequest(ArticlesRequest)
+  , articles
+  )
+import Conduit.Frontend.Routes (Route(Article, Profile), printRoute)
+import Conduit.Frontend.Widgets (aAttr, aDynAttr)
 import Data.Foldable (traverse_)
 import Data.Functor (void)
 import Data.Semigroup ((<>))
@@ -45,15 +50,20 @@ import Reflex.Dom (
   , EventName(Click)
   , MonadWidget
   , blank
+  , decodeXhrResponse
   , divClass
   , domEvent
   , el
   , elAttr
   , elClass
   , elClass'
+  , fmapMaybe
   , holdDyn
   , leftmost
+  , performRequestAsync
   , text
+  , traceEventWith
+  , widgetHold
   )
 
 import qualified Data.Map as Map
@@ -78,27 +88,38 @@ newtype TagClicked = TagClicked {
   clickedTag :: Tag
 } deriving (Eq, Ord)
 
-homePage :: (MonadWidget t m) => Articles -> m ()
-homePage as =
-  divClass "home-page" $ do
-    banner
-    divClass "container page" $
-      divClass "row" $ do
-        divClass "col-md-9" $ do
-          rec feedClicked <- feedToggle feedDyn
-              feedDyn <- holdDyn YourFeed feedClicked
-          traverse_ articlePreview (articlesArticles as)
-        divClass "col-md-3" $
-          void $ sidebar $ Tags [
-              Tag "programming"
-            , Tag "javascript"
-            , Tag "emberjs"
-            , Tag "angularjs"
-            , Tag "react"
-            , Tag "mean"
-            , Tag "node"
-            , Tag "rails"
-            ]
+homePage :: (MonadWidget t m) => Event t () -> m ()
+homePage onLoad =
+  let articlesRequest =
+        ArticlesRequest
+          Nothing
+          Nothing
+          Nothing
+          (Just $ ArticlesLimit 10)
+          Nothing
+      articlesXhr = articles articlesRequest
+  in  do
+    res <- performRequestAsync (const articlesXhr <$> onLoad)
+    let articlesFromServer = decodeXhrResponse <$> (traceEventWith (const "Got server response.") res)
+    divClass "home-page" $ do
+      banner
+      divClass "container page" $
+        divClass "row" $ do
+          divClass "col-md-9" $ do
+            rec feedClicked <- feedToggle feedDyn
+                feedDyn <- holdDyn YourFeed feedClicked
+            articleListDyn (fmapMaybe id articlesFromServer)
+          divClass "col-md-3" $
+            void $ sidebar $ Tags [
+                Tag "programming"
+              , Tag "javascript"
+              , Tag "emberjs"
+              , Tag "angularjs"
+              , Tag "react"
+              , Tag "mean"
+              , Tag "node"
+              , Tag "rails"
+              ]
 
 banner :: (MonadWidget t m) => m ()
 banner =
@@ -126,6 +147,12 @@ feedToggleItem label feed feedDyn =
         clicked <- aDynAttr feedAttrDyn $ text label
         return $ const feed <$> clicked
 
+articleListDyn :: (MonadWidget t m) => Event t Articles -> m ()
+articleListDyn as = void $ widgetHold (text "Loading articles...") (articleList <$> as)
+
+articleList :: (MonadWidget t m) => Articles -> m ()
+articleList as = traverse_ articlePreview (articlesArticles as)
+
 articlePreview:: (MonadWidget t m) => Article -> m (Event t ArticlePreviewEvent)
 articlePreview article =
   divClass "article-preview" $ do
@@ -150,7 +177,7 @@ authorImage profile =
       imageSrc = getImage . profileImage $ profile
       inner = elAttr "img" ("src" =: imageSrc) blank
   in  do
-    imageClicked <- aAttr ("href" =: renderRoute route) inner
+    imageClicked <- aAttr ("href" =: printRoute route) inner
     return $ const route <$> imageClicked
 
 articleInfo :: (MonadWidget t m) => Article -> m (Event t Route)
@@ -158,7 +185,7 @@ articleInfo article =
   let author = profileUsername . articleAuthor $ article
       createdAt = getArticleCreatedAt . articleCreatedAt $ article
       route = Profile author
-      attrs = Map.fromList [("class", "author"), ("href", renderRoute route)]
+      attrs = Map.fromList [("class", "author"), ("href", printRoute route)]
   in  divClass "info" $ do
         authorClicked <- aAttr attrs $ text . getUsername $ author
         elClass "span" "date" $ text . Text.pack . show $ createdAt
@@ -184,7 +211,7 @@ articleFavorites article =
 previewLink :: (MonadWidget t m) => Article -> m (Event t Route)
 previewLink article =
   let attrs = Map.fromList [("class", "preview-link"), ("href", href)]
-      href = renderRoute route
+      href = printRoute route
       route = Article . articleSlug $ article
       inner = do
         el "h1" $ text . getArticleTitle . articleTitle $ article
