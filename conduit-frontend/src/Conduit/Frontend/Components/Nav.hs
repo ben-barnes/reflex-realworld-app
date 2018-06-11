@@ -39,7 +39,10 @@ banner =
   let attrs = Map.fromList [("href", printRoute Home), ("class", "navbar-brand")]
   in  do
     clicked <- aAttr attrs $ text "conduit"
-    return $ const Home <$> clicked
+    return $ Home <$ clicked
+
+-- Not authed: Home SignIn SignUp
+-- Authed: Home NewArticle Settings (Profile Username)
 
 navbar :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
 navbar route =
@@ -74,4 +77,4 @@ navItem route linkRoute matches inner =
       dynAttr = attr <$> route
   in  do
     clicks <- elClass "li" "nav-item" $ aDynAttr dynAttr inner
-    return $ const linkRoute <$> clicks
+    return $ linkRoute <$ clicks

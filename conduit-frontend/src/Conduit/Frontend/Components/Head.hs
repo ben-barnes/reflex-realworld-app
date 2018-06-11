@@ -28,15 +28,15 @@ conduitHead =
 
 conduitStylesheet :: Text
 conduitStylesheet =
-  "//demo.productionready.io/main.css"
+  "https://demo.productionready.io/main.css"
 
 iconsStylesheet :: Text
 iconsStylesheet =
-  "//code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css"
+  "https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css"
 
 fontsStylesheet :: Text
 fontsStylesheet =
-  let baseUrl = "//fonts.googleapis.com/css?family="
+  let baseUrl = "https://fonts.googleapis.com/css?family="
       fonts   = Text.intercalate "|" [
           titilliumWeb
         , sourceSerifPro

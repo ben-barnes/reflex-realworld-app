@@ -4,59 +4,67 @@
 
 -- TODO:
 -- [ ] Non-breaking space in New Post link
--- [x] Dynamic active link in nav
 -- [ ] Format date in article preview
--- [ ] Set hash to match chosen route
 
 module Main (
   main
 ) where
 
-import Data.Functor (void)
-import Data.Text (Text)
-import Language.Javascript.JSaddle.Warp (run)
+import Conduit.Frontend.Components.Footer (conduitFooter)
 import Conduit.Frontend.Components.Head (conduitHead)
 import Conduit.Frontend.Components.Nav (conduitNav)
-import Conduit.Frontend.Pages.Home (homePage)
+import Conduit.Frontend.Data.SessionEvent (chooseAuthEvent, chooseRouteEvent)
+import Conduit.Frontend.Pages.Home (homePage, provisionHomePage)
+import Conduit.Frontend.Pages.Login (loginPage)
 import Conduit.Frontend.Pages.Register (registerPage)
 import Conduit.Frontend.Router (routeLoop)
-import Conduit.Frontend.Routes (Route, parseRoute, printRoute)
-import Reflex.Dom hiding (mainWidgetWithHead, run)
+import Conduit.Frontend.Routes (
+    Route(Home, Login, Register)
+  , isHome
+  , parseRoute
+  , printRoute
+  )
+import Data.Functor (void)
+import Language.Javascript.JSaddle.Warp (run)
+import Reflex.Dom (
+    Event
+  , MonadWidget
+  , blank
+  , ffilter
+  , fmapMaybe
+  , holdDyn
+  , leftmost
+  , never
+  , switchDyn
+  , text
+  , updated
+  , widgetHold
+  )
 import Reflex.Dom.Core (mainWidgetWithHead)
-
-import qualified Data.Map as Map
-import qualified Conduit.Frontend.Routes as Route
 
 main :: IO ()
 main = run 3911 $ mainWidgetWithHead conduitHead $ do
-  rec routeEvents <- routeLoop Route.Home printRoute parseRoute navRoutes
-      currentRoute <- holdDyn Route.Home routeEvents
-      navRoutes <- conduitNav currentRoute
-  dynText (printRoute <$> currentRoute)
-  conduitFooter
+  rec allRoutes    <- routeLoop Home printRoute parseRoute allInternalRoutes
+      currentRoute <- holdDyn Home allRoutes
+      navRoutes    <- conduitNav currentRoute
+      bodyRoutes   <- conduitBody (updated currentRoute)
+      footerRoutes <- conduitFooter
+      let allInternalRoutes = leftmost [navRoutes, bodyRoutes, footerRoutes]
+  return ()
 
-conduitBody :: (MonadWidget t m) => Dynamic t Route -> m ()
-conduitBody route =
-  void . dyn $ choosePage (void $ updated route) <$> route
-
-choosePage :: (MonadWidget t m) => Event t () -> Route -> m ()
-choosePage _      Route.Register = void $ registerPage
-choosePage onLoad _              = void $ homePage onLoad
-
-conduitFooter :: (MonadWidget t m) => m ()
-conduitFooter =
-  el "footer" $
-    divClass "container" $ do
-      anchorClass "/" "logo-font" $ text "conduit"
-      elClass "span" "attribution" $ do
-        text "An interactive learning project from "
-        anchor "https://thinkster.io" $ text "Thinkster"
-        text ". Code & design licensed under MIT."
-
-anchor :: (MonadWidget t m) => Text -> m a -> m a
-anchor href =
-  elAttr "a" (Map.fromList [("href", href)])
-
-anchorClass :: (MonadWidget t m) => Text -> Text -> m a -> m a
-anchorClass href cls =
-  elAttr "a" (Map.fromList [("class", cls), ("href", href)])
+conduitBody :: (MonadWidget t m) => Event t Route -> m (Event t Route)
+conduitBody routes = do
+  rec homePageAuth <- holdDyn Nothing (Just <$> authEvents)
+      homePageData <- provisionHomePage (void $ ffilter isHome routes)
+      let homePage'     = homePage homePageData homePageAuth
+          loginPage'    = loginPage
+          registerPage' = registerPage
+          choosePage Home     = homePage'
+          choosePage Login    = loginPage'
+          choosePage Register = registerPage'
+          choosePage _        = never <$ text "Not yet implemented."
+      sessionEvents <- widgetHold (never <$ blank) (choosePage <$> routes)
+      let sessionEventsFlat = switchDyn sessionEvents
+      let authEvents = fmapMaybe chooseAuthEvent sessionEventsFlat
+          routeEvents = fmapMaybe chooseRouteEvent sessionEventsFlat
+  return routeEvents

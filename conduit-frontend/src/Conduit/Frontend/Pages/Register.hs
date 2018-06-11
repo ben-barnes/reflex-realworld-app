@@ -16,130 +16,79 @@ import Conduit.Common.Data (
 import Conduit.Frontend.API (
     AuthProfile
   , NewUser(NewUser)
-  , RegisterError
-  , RegisterFailure
   , RegisterRequest(RegisterRequest)
   , RegisterResponse (RegisterResponseSuccess, RegisterResponseFailure)
-  , getRegisterError
   , register
-  , registerErrorsEmail
-  , registerErrorsPassword
-  , registerErrorsUsername
-  , registerFailureErrors
+  )
+import Conduit.Frontend.API.Errors (Errors)
+import Conduit.Frontend.Components.ErrorList (errorList)
+import Conduit.Frontend.Components.Form (form, formTextInput, formSubmitButton)
+import Conduit.Frontend.Data.SessionEvent (
+    SessionEvent(SessionAuthEvent, SessionRouteEvent)
   )
 import Conduit.Frontend.Routes (Route(Login), printRoute)
 import Conduit.Frontend.Widgets (aAttr)
-import Control.Monad ((>=>))
-import Data.Foldable (traverse_)
-import Data.List (concat)
-import Data.Maybe (catMaybes)
-import Data.Semigroup ((<>))
-import Data.Text (Text)
-import GHCJS.DOM.Element (Element(Element))
-import GHCJS.DOM.EventM (on)
-import GHCJS.DOM.GlobalEventHandlers (input)
-import GHCJS.DOM.HTMLInputElement (HTMLInputElement(HTMLInputElement), getValue)
-import GHCJS.DOM.Types (uncheckedCastTo)
 import Reflex.Dom (
     (=:)
   , Dynamic
   , Event
-  , EventName(Click)
   , MonadWidget
-  , _element_raw
+  , _xhrResponse_responseText
   , blank
   , decodeXhrResponse
   , divClass
-  , domEvent
-  , el
-  , elAttr'
   , elClass
-  , elClass'
+  , fanEither
   , fmapMaybe
-  , holdDyn
   , leftmost
   , performRequestAsync
-  , tagPromptlyDyn
   , text
+  , traceEventWith
   , widgetHold
-  , wrapDomEvent
   )
 
-import qualified Data.Map as Map
-
-data RegisterPageEvent
-  = RegisterPageEventAuth AuthProfile
-  | RegisterPageEventRoute Route
-
-registerPage :: (MonadWidget t m) => m (Event t RegisterPageEvent)
+registerPage :: (MonadWidget t m) => m (Event t SessionEvent)
 registerPage =
   divClass "auth-page" $
     divClass "container page" $
       divClass "row" $
         divClass "col-md-6 offset-md-3 col-xs-12" $ do
           elClass "h1" "text-xs-center" $ text "Sign up"
-          loginClicked <- elClass "p" "text-xs-center" $
-            aAttr ("href" =: printRoute Login) $ text "Have an account?"
-          rec _ <- widgetHold blank (errorList <$> failure)
-              (success, failure) <- el "form" $ do
-                nameValue <- formTextInput "text" "Your Name"
-                emailValue <- formTextInput "text" "Email"
-                passwordValue <- formTextInput "password" "Password"
-                buttonClick <- signUpButton
-                let name = Username <$> nameValue
-                    email = Email <$> emailValue
-                    password = Password <$> passwordValue
-                    newUser = NewUser <$> name <*> email <*> password
-                    registerRequest = RegisterRequest <$> newUser
-                    registerXhr = register <$> registerRequest
-                    sendRegisterRequest = tagPromptlyDyn registerXhr buttonClick
-                res <- performRequestAsync sendRegisterRequest
-                let getSuccess (RegisterResponseSuccess s) = Just s
-                    getSuccess _ = Nothing
-                    getFailure (RegisterResponseFailure f) = Just f
-                    getFailure _ = Nothing
-                    resSuccess = fmapMaybe (decodeXhrResponse >=> getSuccess) res
-                    resFailure = (decodeXhrResponse >=> getFailure) <$> res
-                return (resSuccess, resFailure)
+          loginClicked <- loginLink
+          authEvents <- registrationFormWithErrors
           return $ leftmost [
-              RegisterPageEventAuth <$> success
-            , const (RegisterPageEventRoute Login) <$> loginClicked
+              SessionAuthEvent <$> authEvents
+            , SessionRouteEvent Login <$ loginClicked
             ]
 
-errorList :: (MonadWidget t m) => Maybe RegisterFailure -> m ()
-errorList Nothing = blank
-errorList (Just f) =
-  let errors = registerFailureErrors f
-      allErrors = concat . catMaybes $ [
-          prefixErrors "Email" <$> registerErrorsEmail errors
-        , prefixErrors "Password" <$> registerErrorsPassword errors
-        , prefixErrors "Username" <$> registerErrorsUsername errors
-        ]
-      renderError e = el "li" $ text e
-  in  elClass "ul" "error-messages" $
-        traverse_ renderError allErrors
+loginLink :: (MonadWidget t m) => m (Event t Route)
+loginLink =
+  elClass "p" "text-xs-center" $ do
+    clicked <- aAttr ("href" =: printRoute Login) $ text "Have an account?"
+    return $ Login <$ clicked
 
-prefixErrors :: Text -> [RegisterError] -> [Text]
-prefixErrors prefix es =
-  let addPrefix e = prefix <> " " <> e
-  in  addPrefix . getRegisterError <$> es
+registrationFormWithErrors :: (MonadWidget t m) => m (Event t AuthProfile)
+registrationFormWithErrors = do
+  rec _ <- widgetHold blank (errorList <$> failure)
+      (failure, success) <- registrationForm
+  return success
 
-formTextInput :: (MonadWidget t m) => Text -> Text -> m (Dynamic t Text)
-formTextInput tpe placeholder = 
-  let classAttr = ("class", "form-control form-control-lg")
-      typeAttr = ("type", tpe)
-      placeholderAttr = ("placeholder", placeholder)
-      attrs = Map.fromList [classAttr, typeAttr, placeholderAttr]
-  in  do
-    elClass "fieldset" "form-group" $ do
-      (e, _) <- elAttr' "input" attrs $ blank
-      let inputElement = uncheckedCastTo HTMLInputElement (_element_raw e)
-      onInput <- wrapDomEvent inputElement (`on` input) (getValue inputElement)
-      holdDyn "" onInput
+registrationForm :: (MonadWidget t m) => m (Event t Errors, Event t AuthProfile)
+registrationForm = do
+  req <- form registrationInputs $ formSubmitButton "Sign up"
+  res <- performRequestAsync (register <$> req)
+  let resToEither (RegisterResponseSuccess p) = Right p
+      resToEither (RegisterResponseFailure f) = Left f
+      validResponses = fmapMaybe decodeXhrResponse (traceEventWith (show . _xhrResponse_responseText ) res)
+  return $ fanEither (resToEither <$> (traceEventWith (const "Valid response") validResponses))
 
-signUpButton :: (MonadWidget t m) => m (Event t ())
-signUpButton =
-  let buttonClasses = "btn btn-lg btn-primary pull-xs-right"
-  in  do
-    (e, _) <- elClass' "button" buttonClasses $ text "Sign up"
-    return $ domEvent Click e
+registrationInputs :: (MonadWidget t m) => m (Dynamic t RegisterRequest)
+registrationInputs = do
+  name     <- formTextInput "text" "Your Name"
+  email    <- formTextInput "text" "Email"
+  password <- formTextInput "password" "Password"
+  let newUser = NewUser
+        <$> (Username <$> name)
+        <*> (Email <$> email)
+        <*> (Password <$> password)
+  return $ RegisterRequest <$> newUser

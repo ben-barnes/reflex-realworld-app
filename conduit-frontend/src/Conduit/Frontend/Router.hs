@@ -7,14 +7,14 @@ module Conduit.Frontend.Router (
 
 import Data.Text (Text)
 import GHCJS.DOM (currentWindow)
-import GHCJS.DOM.EventM (on)
+import GHCJS.DOM.EventM (on, preventDefault, stopPropagation)
 import GHCJS.DOM.Location (getHash, setHash)
 import GHCJS.DOM.Types (MonadDOM)
 import GHCJS.DOM.Window (Window, getLocation)
 import GHCJS.DOM.WindowEventHandlers (hashChange)
 import Reflex.Dom (
-    MonadWidget
-  , Event
+    Event
+  , MonadWidget
   , fanEither
   , getPostBuild
   , leftmost
@@ -33,10 +33,10 @@ routeLoop defaultRoute printRoute parseRoute internalRoute = do
   w <- currentWindow
   onLoad <- getPostBuild
   case w of
-    Nothing -> return $ leftmost [const defaultRoute <$> onLoad, internalRoute]
+    Nothing -> return $ leftmost [defaultRoute <$ onLoad, internalRoute]
     Just w' -> do
       windowHash <- getWindowHash w'
-      let routeOnLoad = const (parseRoute windowHash) <$> onLoad
+      let routeOnLoad = parseRoute windowHash <$ onLoad
           (initRedir, initRoute) = fanEither routeOnLoad
       rec let allInternalRoutes = leftmost [initRedir, internalRoute, subsRedir]
           allHashChanges <- hashLoop w' (printRoute <$> allInternalRoutes)
@@ -46,7 +46,11 @@ routeLoop defaultRoute printRoute parseRoute internalRoute = do
 hashLoop :: (MonadWidget t m) => Window -> Event t Text -> m (Event t Text)
 hashLoop w internalHash = do
   performEvent_ $ setWindowHash w <$> internalHash
-  wrapDomEvent w (`on` hashChange) (getWindowHash w)
+  windowHash <- wrapDomEvent w (`on` hashChange) $ do
+    stopPropagation
+    preventDefault
+    getWindowHash w
+  return $ windowHash
 
 getWindowHash :: (MonadDOM m) => Window -> m (Text)
 getWindowHash w = getLocation w >>= getHash

@@ -81,7 +81,7 @@ parseRoute r =
     ["#article", s]              -> Right (Article (ArticleSlug s))
     ["#profile", u]              -> Right (Profile (Username u))
     ["#profile", u, "favorites"] -> Right (Favorites (Username u))
-    _                           -> Left Home
+    _                            -> Left Home
 
 printRoute :: Route -> Text
 printRoute Home          = "#home"

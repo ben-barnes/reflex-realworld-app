@@ -2,18 +2,20 @@
 
 module Conduit.Frontend.API (
   ArticlesLimit(..)
+, ArticlesOffset(..)
 , ArticlesRequest(..)
 , AuthProfile(..)
+, Credentials(Credentials)
 , LoginRequest(..)
+, LoginResponse(..)
 , NewUser(..)
-, RegisterError(..)
-, RegisterErrors(..)
-, RegisterFailure(..)
 , RegisterRequest(..)
 , RegisterResponse(..)
+, TagsResponse(..)
 , articles
 , login
 , register
+, tags
 ) where
 
 import Conduit.Common.Data (
@@ -22,11 +24,13 @@ import Conduit.Common.Data (
   , Image
   , Password
   , Tag
+  , Tags
   , Token
   , Username
   , getTag
   , getUsername
   )
+import Conduit.Frontend.API.Errors (Errors)
 import Control.Applicative ((<|>))
 import Data.Aeson (
     (.:)
@@ -59,6 +63,9 @@ articles r =
 
 register :: RegisterRequest -> XhrRequest Text
 register req = postJson (prefix <> "/users") req
+
+tags :: XhrRequest ()
+tags = xhrRequest "GET" (prefix <> "/tags") def
 
 articlesQuery :: ArticlesRequest -> QueryString
 articlesQuery r = queryString . catMaybes $ [
@@ -98,17 +105,18 @@ data AuthProfile = AuthProfile {
   authProfileEmail :: Email
 , authProfileToken :: Token
 , authProfileUsername :: Username
-, authProfileBio :: Bio
-, authProfileImage :: Image
+, authProfileBio :: Maybe Bio
+, authProfileImage :: Maybe Image
 } deriving (Eq, Ord)
 
 instance FromJSON AuthProfile where
-  parseJSON = withObject "AuthProfile" $ \v -> AuthProfile
-    <$> v .: "email"
-    <*> v .: "token"
-    <*> v .: "username"
-    <*> v .: "bio"
-    <*> v .: "image"
+  parseJSON = withObject "AuthProfile" $ \v ->
+    v .: "user" >>= \u -> AuthProfile
+      <$> u .: "email"
+      <*> u .: "token"
+      <*> u .: "username"
+      <*> u .:? "bio"
+      <*> u .:? "image"
 
 data Credentials = Credentials {
   credentialsEmail :: Email
@@ -128,6 +136,15 @@ data LoginRequest = LoginRequest {
 instance ToJSON LoginRequest where
   toJSON r = object ["user" .= loginRequestUser r]
 
+data LoginResponse
+  = LoginResponseFailure Errors
+  | LoginResponseSuccess AuthProfile
+
+instance FromJSON LoginResponse where
+  parseJSON v =
+        LoginResponseSuccess <$> parseJSON v
+    <|> LoginResponseFailure <$> parseJSON v
+
 data NewUser = NewUser {
   newUserUsername :: Username
 , newUserEmail :: Email
@@ -145,33 +162,6 @@ newtype QueryString = QueryString {
   getQueryString :: Text
 } deriving (Eq, Ord)
 
-newtype RegisterError = RegisterError {
-  getRegisterError :: Text
-} deriving (Eq, Ord)
-
-instance FromJSON RegisterError where
-  parseJSON = fmap RegisterError . parseJSON
-
-data RegisterErrors = RegisterErrors {
-  registerErrorsEmail :: Maybe [RegisterError]
-, registerErrorsPassword :: Maybe [RegisterError]
-, registerErrorsUsername :: Maybe [RegisterError]
-} deriving (Eq, Ord)
-
-instance FromJSON RegisterErrors where
-  parseJSON = withObject "RegisterErrors" $ \v -> RegisterErrors
-    <$> v .:? "email"
-    <*> v .:? "password"
-    <*> v .:? "username"
-
-newtype RegisterFailure = RegisterFailure {
-  registerFailureErrors :: RegisterErrors
-} deriving (Eq, Ord)
-
-instance FromJSON RegisterFailure where
-  parseJSON = withObject "RegisterFailure" $ \v -> RegisterFailure
-    <$> v .: "errors"
-
 newtype RegisterRequest = RegisterRequest {
   registerRequestUser :: NewUser
 } deriving (Eq, Ord)
@@ -180,7 +170,7 @@ instance ToJSON RegisterRequest where
   toJSON r = object ["user" .= registerRequestUser r]
 
 data RegisterResponse
-  = RegisterResponseFailure RegisterFailure
+  = RegisterResponseFailure Errors
   | RegisterResponseSuccess AuthProfile
     deriving (Eq, Ord)
 
@@ -188,3 +178,11 @@ instance FromJSON RegisterResponse where
   parseJSON v =
         RegisterResponseSuccess <$> parseJSON v
     <|> RegisterResponseFailure <$> parseJSON v
+
+newtype TagsResponse = TagsResponse {
+  tagsResponseTags :: Tags
+} deriving (Eq, Ord)
+
+instance FromJSON TagsResponse where
+  parseJSON = withObject "TagsResponse" $ \v -> TagsResponse
+    <$> v .: "tags"
