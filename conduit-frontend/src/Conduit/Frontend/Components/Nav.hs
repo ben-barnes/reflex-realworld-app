@@ -4,10 +4,14 @@ module Conduit.Frontend.Components.Nav (
   conduitNav
 ) where
 
+import Conduit.Common.Data (getUsername)
+import Conduit.Frontend.API (AuthProfile, authProfileUsername)
 import Conduit.Frontend.Routes (
-    Route(Editor, Home, Register, Settings)
+    Route(Editor, Home, Login, Profile, Register, Settings)
   , isEditor
   , isHome
+  , isLogin
+  , isProfile
   , isRegister
   , isSettings
   , printRoute
@@ -19,19 +23,27 @@ import Reflex.Dom (
   , MonadWidget
   , blank
   , divClass
+  , dyn
   , elClass
+  , ffor
   , leftmost
+  , never
+  , switchHoldPromptly
   , text
   )
 
 import qualified Data.Map as Map
 
-conduitNav :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
-conduitNav route =
+conduitNav
+  :: (MonadWidget t m)
+  => Dynamic t (Maybe AuthProfile)
+  -> Dynamic t Route
+  -> m (Event t Route)
+conduitNav auth route =
   elClass "nav" "navbar navbar-light" $
     divClass "container" $ do
       bannerClicked <- banner
-      navbarClicked <- navbar route
+      navbarClicked <- navbar auth route
       return $ leftmost [bannerClicked, navbarClicked]
 
 banner :: (MonadWidget t m) => m (Event t Route)
@@ -41,12 +53,27 @@ banner =
     clicked <- aAttr attrs $ text "conduit"
     return $ Home <$ clicked
 
--- Not authed: Home SignIn SignUp
--- Authed: Home NewArticle Settings (Profile Username)
+navbar
+  :: (MonadWidget t m)
+  => Dynamic t (Maybe AuthProfile)
+  -> Dynamic t Route
+  -> m (Event t Route)
+navbar auth route =
+  let chooseNav = ffor auth $ \a -> case a of
+        Just a' -> authedNavItems a' route
+        Nothing -> unauthedNavItems route
+  in  elClass "ul" "nav navbar-nav pull-xs-right" $ do
+        es <- dyn chooseNav
+        switchHoldPromptly never es
 
-navbar :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
-navbar route =
-  elClass "ul" "nav navbar-nav pull-xs-right" $ do
+authedNavItems
+  :: (MonadWidget t m)
+  => AuthProfile
+  -> Dynamic t Route
+  -> m (Event t Route)
+authedNavItems auth route =
+  let username = authProfileUsername auth
+  in  do
     homeRoutes <- navItem route Home isHome $
       text "Home"
     editorRoutes <- navItem route (Editor Nothing) isEditor $ do
@@ -55,10 +82,19 @@ navbar route =
     settingsRoutes <- navItem route Settings isSettings $ do
       elClass "i" "ion-gear-a" blank
       text " Settings"
-    registerRoutes <- navItem route Register isRegister $ 
-      text "Sign up"
-    return $
-      leftmost [homeRoutes, editorRoutes, settingsRoutes, registerRoutes]
+    profileRoutes <- navItem route (Profile username) isProfile $
+      text (getUsername username)
+    return $ leftmost [homeRoutes, editorRoutes, settingsRoutes, profileRoutes]
+
+unauthedNavItems :: (MonadWidget t m) => Dynamic t Route -> m (Event t Route)
+unauthedNavItems route = do
+  homeRoutes <- navItem route Home isHome $
+    text "Home"
+  loginRoutes <- navItem route Login isLogin $
+    text "Sign in"
+  registerRoutes <- navItem route Register isRegister $
+    text "Sign up"
+  return $ leftmost [homeRoutes, loginRoutes, registerRoutes]
 
 navItem
   :: (MonadWidget t m)

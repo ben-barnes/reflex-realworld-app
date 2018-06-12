@@ -8,11 +8,11 @@ import Conduit.Frontend.API (AuthProfile)
 import Conduit.Frontend.Routes (Route)
 
 data SessionEvent
-  = SessionAuthEvent AuthProfile
+  = SessionAuthEvent (Maybe AuthProfile)
   | SessionRouteEvent Route
     deriving (Eq, Ord)
 
-chooseAuthEvent :: SessionEvent -> Maybe AuthProfile
+chooseAuthEvent :: SessionEvent -> Maybe (Maybe AuthProfile)
 chooseAuthEvent (SessionAuthEvent p) = Just p
 chooseAuthEvent _                    = Nothing
 

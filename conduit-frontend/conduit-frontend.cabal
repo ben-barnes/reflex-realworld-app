@@ -33,7 +33,9 @@ executable conduit-frontend
                      , Conduit.Frontend.Pages.Home
                      , Conduit.Frontend.Pages.Login
                      , Conduit.Frontend.Pages.Register
+                     , Conduit.Frontend.Pages.Settings
                      , Conduit.Frontend.Routes
                      , Conduit.Frontend.Router
+                     , Conduit.Frontend.Storage
                      , Conduit.Frontend.Widgets
   ghc-options:         -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-import-lists

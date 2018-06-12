@@ -15,7 +15,11 @@ import Conduit.Frontend.API (
   )
 import Conduit.Frontend.API.Errors (Errors)
 import Conduit.Frontend.Components.ErrorList (errorList)
-import Conduit.Frontend.Components.Form (form, formSubmitButton, formTextInput)
+import Conduit.Frontend.Components.Form (
+    form
+  , formSubmitButton
+  , formTextInputLarge
+  )
 import Conduit.Frontend.Data.SessionEvent (
     SessionEvent(SessionAuthEvent, SessionRouteEvent)
   )
@@ -48,7 +52,7 @@ loginPage =
           registerClicked <- registerLink
           authEvents <- loginFormWithErrors
           return $ leftmost [
-              SessionAuthEvent <$> authEvents
+              SessionAuthEvent . Just <$> authEvents
             , SessionRouteEvent Register <$ registerClicked
             ]
 
@@ -75,8 +79,8 @@ loginForm = do
 
 loginInputs :: (MonadWidget t m) => m (Dynamic t LoginRequest)
 loginInputs = do
-  email    <- formTextInput "text" "Email"
-  password <- formTextInput "password" "Password"
+  email    <- formTextInputLarge "text" "Email"
+  password <- formTextInputLarge "password" "Password"
   let credentials = Credentials
         <$> (Email <$> email)
         <*> (Password <$> password)

@@ -16,6 +16,7 @@ module Conduit.Frontend.API (
 , login
 , register
 , tags
+, user
 ) where
 
 import Conduit.Common.Data (
@@ -28,6 +29,7 @@ import Conduit.Common.Data (
   , Token
   , Username
   , getTag
+  , getToken
   , getUsername
   )
 import Conduit.Frontend.API.Errors (Errors)
@@ -46,7 +48,14 @@ import Data.Aeson (
 import Data.Maybe (catMaybes)
 import Data.Semigroup ((<>))
 import Data.Text (Text)
-import Reflex.Dom (XhrRequest, def, postJson, xhrRequest)
+import Reflex.Dom (
+    (=:)
+  , XhrRequest
+  , _xhrRequestConfig_headers
+  , def
+  , postJson
+  , xhrRequest
+  )
 
 import qualified Data.Text as Text
 
@@ -66,6 +75,12 @@ register req = postJson (prefix <> "/users") req
 
 tags :: XhrRequest ()
 tags = xhrRequest "GET" (prefix <> "/tags") def
+
+user :: Token -> XhrRequest ()
+user token = 
+  let headers = "Authorization" =: ("Token " <> (getToken token))
+      config  = def { _xhrRequestConfig_headers = headers }
+  in  xhrRequest "GET" (prefix <> "/user") config
 
 articlesQuery :: ArticlesRequest -> QueryString
 articlesQuery r = queryString . catMaybes $ [
