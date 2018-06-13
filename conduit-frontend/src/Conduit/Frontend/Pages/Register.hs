@@ -88,9 +88,9 @@ registrationForm = do
 
 registrationInputs :: (MonadWidget t m) => m (Dynamic t RegisterRequest)
 registrationInputs = do
-  name     <- formTextInputLarge "text" "Your Name"
-  email    <- formTextInputLarge "text" "Email"
-  password <- formTextInputLarge "password" "Password"
+  name     <- formTextInputLarge Nothing "text" "Your Name"
+  email    <- formTextInputLarge Nothing "text" "Email"
+  password <- formTextInputLarge Nothing "password" "Password"
   let newUser = NewUser
         <$> (Username <$> name)
         <*> (Email <$> email)

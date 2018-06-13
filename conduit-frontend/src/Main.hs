@@ -29,6 +29,7 @@ import Conduit.Frontend.Routes (
   )
 import Conduit.Frontend.Storage (retrieveToken, storeToken)
 import Data.Functor (void)
+import Data.Maybe (fromJust)
 import Language.Javascript.JSaddle.Warp (run)
 import Reflex.Dom (
     Dynamic
@@ -93,7 +94,7 @@ choosePage auth route = case route of
   Home          -> never <$ text "Not yet implemented"
   Login         -> loginPage
   Register      -> registerPage
-  Settings      -> settingsPage undefined
+  Settings      -> settingsPage (fromJust auth) -- TODO: NO!!!
   (Editor _)    -> never <$ text "Not yet implemented"
   (Article _)   -> never <$ text "Not yet implemented"
   (Profile _)   -> never <$ text "Not yet implemented"

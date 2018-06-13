@@ -10,6 +10,7 @@ module Conduit.Frontend.Components.Form (
 , formTextInputSmall
 ) where
 
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import GHCJS.DOM.Element (Element(Element))
 import GHCJS.DOM.EventM (on)
@@ -55,15 +56,17 @@ formSubmitButton label =
 
 formTextAreaClass
   :: (MonadWidget t m)
-  => Text
+  => Maybe Text
+  -> Text
   -> Int
   -> Text
   -> m (Dynamic t Text)
-formTextAreaClass placeholder rows cls =
+formTextAreaClass value placeholder rows cls =
   let attr = Map.fromList [
           ("class", cls)
         , ("rows", rowsText)
         , ("placeholder", placeholder)
+        , ("value", fromMaybe "" value)
         ]
       rowsText = Text.pack . show $ rows
   in  elClass "fieldset" "form-group" $ do
@@ -79,25 +82,29 @@ formTextAreaClass placeholder rows cls =
 
 formTextAreaLarge
   :: (MonadWidget t m)
-  => Text
+  => Maybe Text
+  -> Text
   -> Int
   -> m (Dynamic t Text)
-formTextAreaLarge placeholder rows =
-  formTextAreaClass placeholder rows "form-control form-control-lg"
+formTextAreaLarge value placeholder rows =
+  formTextAreaClass value placeholder rows "form-control form-control-lg"
 
 formTextInputClass
   :: (MonadWidget t m)
-  => Text
+  => Maybe Text
+  -> Text
   -> Text
   -> Text
   -> m (Dynamic t Text)
-formTextInputClass tpe placeholder cls = 
-  let classAttr = ("class", cls)
-      typeAttr  = ("type", tpe)
-      placeholderAttr = ("placeholder", placeholder)
-      attrs = Map.fromList [classAttr, typeAttr, placeholderAttr]
+formTextInputClass value tpe placeholder cls = 
+  let attr = Map.fromList [
+          ("class", cls)
+        , ("type", tpe)
+        , ("placeholder", placeholder)
+        , ("value", fromMaybe "" value)
+        ]
   in  elClass "fieldset" "form-group" $ do
-        (e, _) <- elAttr' "input" attrs $ blank
+        (e, _) <- elAttr' "input" attr $ blank
         let inputElement = uncheckedCastTo HTMLInputElement (_element_raw e)
         onInput <- wrapDomEvent
                      inputElement
@@ -107,17 +114,19 @@ formTextInputClass tpe placeholder cls =
 
 formTextInputLarge
   :: (MonadWidget t m)
-  => Text
+  => Maybe Text
+  -> Text
   -> Text
   -> m (Dynamic t Text)
-formTextInputLarge tpe placeholder =
-  formTextInputClass tpe placeholder "form-control form-control-lg"
+formTextInputLarge value tpe placeholder =
+  formTextInputClass value tpe placeholder "form-control form-control-lg"
 
 formTextInputSmall
   :: (MonadWidget t m)
-  => Text
+  => Maybe Text
+  -> Text
   -> Text
   -> m (Dynamic t Text)
-formTextInputSmall tpe placeholder =
-  formTextInputClass tpe placeholder "form-control"
+formTextInputSmall value tpe placeholder =
+  formTextInputClass value tpe placeholder "form-control"
 

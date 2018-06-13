@@ -79,8 +79,8 @@ loginForm = do
 
 loginInputs :: (MonadWidget t m) => m (Dynamic t LoginRequest)
 loginInputs = do
-  email    <- formTextInputLarge "text" "Email"
-  password <- formTextInputLarge "password" "Password"
+  email    <- formTextInputLarge Nothing "text" "Email"
+  password <- formTextInputLarge Nothing "password" "Password"
   let credentials = Credentials
         <$> (Email <$> email)
         <*> (Password <$> password)
